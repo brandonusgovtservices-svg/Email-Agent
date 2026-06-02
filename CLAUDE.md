@@ -18,8 +18,14 @@ python agent.py
 # Process up to N unread emails
 python agent.py --limit 5
 
-# Read and analyse emails without writing any drafts or calendar events
+# Read and analyse emails without writing any drafts, labels, or calendar events
 python agent.py --dry-run
+
+# Run continuously, checking every 15 minutes
+python agent.py --watch
+
+# Watch mode with custom interval (minutes)
+python agent.py --watch --interval 30
 ```
 
 Copy `.env.example` to `.env` and fill in `ANTHROPIC_API_KEY` before running.
@@ -37,6 +43,8 @@ The agentic loop follows the standard Anthropic SDK pattern:
 
 Prompt caching (`cache_control: ephemeral`) is applied to the system prompt on every `messages.create` call to reduce token costs across the per-email loops.
 
+`--watch` mode keeps the Google services and Anthropic client alive between polling cycles (no re-auth overhead).
+
 ### Auth: `auth.py`
 
 Handles Google OAuth2 for both Gmail and Calendar APIs using a single `get_google_services()` call. Reads `credentials.json` (not committed), writes/refreshes `token.json` (not committed). Required scopes: `gmail.modify` and `calendar`.
@@ -45,11 +53,20 @@ Handles Google OAuth2 for both Gmail and Calendar APIs using a single `get_googl
 
 | File | Purpose |
 |------|---------|
-| `tools/gmail.py` | `list_unread_emails`, `get_email_details`, `create_draft_reply`, `mark_as_read` |
+| `tools/gmail.py` | `list_unread_emails`, `get_email_details`, `create_draft_reply`, `label_email`, `mark_as_read` |
 | `tools/calendar.py` | `get_upcoming_events`, `create_calendar_event` |
 | `tools/definitions.py` | Tool JSON schemas passed to Claude's `tools` parameter |
 
-The `_dispatch()` function in `agent.py` maps tool names from Claude's response to the Python functions above. `--dry-run` short-circuits `create_draft_reply` and `create_calendar_event` in `_dispatch` without touching the LLM loop.
+The `_dispatch()` function in `agent.py` maps tool names from Claude's response to the Python functions above. `--dry-run` short-circuits `create_draft_reply`, `create_calendar_event`, and `label_email` in `_dispatch` without touching the LLM loop.
+
+### Agent behaviour
+
+Claude is instructed to:
+- **Label "Scheduling"** — any email involving a meeting, appointment, or calendar request
+- **Label "Urgent"** — emails with ASAP language, hard deadlines, escalating clients, or compliance notices; labels are auto-created in Gmail on first use via `_get_or_create_label()`
+- **Scheduling flow**: check calendar → create event → draft confirmation reply
+- **Other emails**: draft a casual, direct reply signed with Brandon's full signature
+- **No-reply emails** (receipts, newsletters): skip drafting, briefly explain why
 
 ### Scheduling behaviour
 

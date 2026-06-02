@@ -19,7 +19,6 @@ def get_email_details(gmail_service, msg_id: str) -> dict:
     ).execute()
 
     headers = {h["name"]: h["value"] for h in message["payload"]["headers"]}
-
     body = _extract_body(message["payload"])
 
     return {
@@ -57,10 +56,39 @@ def create_draft_reply(
     return {"draft_id": draft["id"], "status": "Draft created — not sent"}
 
 
+def label_email(gmail_service, msg_id: str, label_name: str) -> dict:
+    """Add a named label to an email, creating the label in Gmail if needed."""
+    label_id = _get_or_create_label(gmail_service, label_name)
+    gmail_service.users().messages().modify(
+        userId="me",
+        id=msg_id,
+        body={"addLabelIds": [label_id]},
+    ).execute()
+    return {"status": f"Labeled '{label_name}'"}
+
+
 def mark_as_read(gmail_service, msg_id: str) -> None:
     gmail_service.users().messages().modify(
         userId="me", id=msg_id, body={"removeLabelIds": ["UNREAD"]}
     ).execute()
+
+
+def _get_or_create_label(gmail_service, name: str) -> str:
+    """Return the Gmail label ID for `name`, creating it if it doesn't exist."""
+    labels = gmail_service.users().labels().list(userId="me").execute()
+    for label in labels.get("labels", []):
+        if label["name"].lower() == name.lower():
+            return label["id"]
+
+    created = gmail_service.users().labels().create(
+        userId="me",
+        body={
+            "name": name,
+            "labelListVisibility": "labelShow",
+            "messageListVisibility": "show",
+        },
+    ).execute()
+    return created["id"]
 
 
 def _extract_body(payload: dict) -> str:

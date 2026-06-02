@@ -14,6 +14,26 @@ TOOLS = [
         },
     },
     {
+        "name": "label_email",
+        "description": (
+            "Add a label to an email for organisation. "
+            "Use 'Scheduling' for meeting/appointment/calendar emails. "
+            "Use 'Urgent' for time-sensitive emails (hard deadlines, ASAP language, escalations, compliance notices)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "email_id": {"type": "string", "description": "Gmail message ID"},
+                "label": {
+                    "type": "string",
+                    "enum": ["Scheduling", "Urgent"],
+                    "description": "Label to apply",
+                },
+            },
+            "required": ["email_id", "label"],
+        },
+    },
+    {
         "name": "get_upcoming_events",
         "description": (
             "Retrieve upcoming Google Calendar events to check existing schedule "
@@ -65,7 +85,7 @@ TOOLS = [
         "name": "create_draft_reply",
         "description": (
             "Compose and save a reply as a Gmail draft. The draft is NOT sent — "
-            "the user reviews and sends manually."
+            "Brandon reviews and sends manually."
         ),
         "input_schema": {
             "type": "object",
