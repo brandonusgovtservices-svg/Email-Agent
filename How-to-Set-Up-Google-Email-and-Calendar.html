@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>How to Set Up Google Email and Calendar</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 16px;
+      line-height: 1.7;
+      color: #1a1a1a;
+      background: #f9f9f9;
+    }
+    .page {
+      max-width: 760px;
+      margin: 40px auto;
+      background: #fff;
+      padding: 48px 56px;
+      border-radius: 12px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    }
+    .logo-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 36px;
+      padding-bottom: 24px;
+      border-bottom: 2px solid #e8e8e8;
+    }
+    .logo-bar .badge {
+      background: #1a73e8;
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+    .logo-bar .company {
+      font-size: 14px;
+      color: #666;
+      font-weight: 500;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #111;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 15px;
+      color: #666;
+      margin-bottom: 36px;
+    }
+    .toc {
+      background: #f0f6ff;
+      border-left: 4px solid #1a73e8;
+      border-radius: 0 8px 8px 0;
+      padding: 18px 24px;
+      margin-bottom: 40px;
+    }
+    .toc h3 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #1a73e8;
+      margin-bottom: 10px;
+    }
+    .toc ol {
+      padding-left: 20px;
+    }
+    .toc li {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    .section {
+      margin-bottom: 44px;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .step-number {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #1a73e8;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .section h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #111;
+    }
+    .steps {
+      padding-left: 0;
+      list-style: none;
+      counter-reset: step-counter;
+    }
+    .steps li {
+      counter-increment: step-counter;
+      display: flex;
+      gap: 14px;
+      margin-bottom: 14px;
+      padding: 14px 16px;
+      background: #fafafa;
+      border: 1px solid #ebebeb;
+      border-radius: 8px;
+    }
+    .steps li::before {
+      content: counter(step-counter);
+      background: #e8f0fe;
+      color: #1a73e8;
+      font-weight: 700;
+      font-size: 13px;
+      min-width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .steps li .text { flex: 1; }
+    .steps li strong { color: #111; }
+    code {
+      background: #f0f0f0;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: "SF Mono", "Courier New", monospace;
+      font-size: 13px;
+      color: #c7254e;
+    }
+    .codeblock {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-family: "SF Mono", "Courier New", monospace;
+      font-size: 13px;
+      margin: 12px 0;
+      overflow-x: auto;
+      line-height: 1.8;
+    }
+    .codeblock .comment { color: #6c7086; }
+    .note {
+      background: #fff8e1;
+      border-left: 4px solid #f9a825;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 18px;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    .note strong { color: #e65100; }
+    .success {
+      background: #e8f5e9;
+      border-left: 4px solid #43a047;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 18px;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    .success strong { color: #2e7d32; }
+    .platform-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 12px 0;
+    }
+    .platform-box {
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .platform-box h4 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .platform-box .codeblock { margin: 8px 0 0 0; }
+    .mac h4 { color: #555; }
+    .win h4 { color: #0078d4; }
+    .divider {
+      border: none;
+      border-top: 1px solid #eee;
+      margin: 36px 0;
+    }
+    .checklist {
+      list-style: none;
+      padding: 0;
+    }
+    .checklist li {
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #fafafa;
+      border: 1px solid #ebebeb;
+    }
+    .checklist li .icon { font-size: 18px; }
+    .footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid #eee;
+      font-size: 13px;
+      color: #999;
+      text-align: center;
+    }
+    @media print {
+      body { background: white; }
+      .page { box-shadow: none; margin: 0; padding: 32px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="logo-bar">
+    <span class="badge">US GOV SERVICES</span>
+    <span class="company">Brandon Michael &nbsp;·&nbsp; brandon@usgovtservices.com</span>
+  </div>
+
+  <h1>How to Set Up Google Email and Calendar</h1>
+  <p class="subtitle">A plain-English guide to connecting your Gmail and Google Calendar to the AI Email Agent.</p>
+
+  <div class="toc">
+    <h3>What's in this guide</h3>
+    <ol>
+      <li>What you need before you start</li>
+      <li>Create a Google Cloud project</li>
+      <li>Turn on Gmail and Calendar</li>
+      <li>Create your login credentials</li>
+      <li>Download and name the credentials file</li>
+      <li>Install Python on your computer</li>
+      <li>Install the agent software</li>
+      <li>Sign in to Google (one-time step)</li>
+      <li>Run the agent</li>
+      <li>Quick reference commands</li>
+    </ol>
+  </div>
+
+
+  <!-- SECTION 1 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-number">1</div>
+      <h2>What You Need Before You Start</h2>
+    </div>
+    <ul class="checklist">
+      <li><span class="icon">📧</span> A Gmail account (e.g. brandon.usgovtservices@gmail.com)</li>
+      <li><span class="icon">🔑</span> An Anthropic API key — get one free at <strong>console.anthropic.com</strong></li>
+      <li><span class="icon">💻</span> A Mac or Windows computer with internet access</li>
+      <li><span class="icon">🐍</span> Python installed (we'll cover this in Step 6)</li>
+    </ul>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- SECTION 2 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-number">2</div>
+      <h2>Create a Google Cloud Project</h2>
+    </div>
+    <p style="margin-bottom:14px; color:#444;">Think of this as creating a "container" in Google where your app will live.</p>
+    <ol class="steps">
+      <li><span class="text">Open your browser and go to <strong>console.cloud.google.com</strong>. Sign in with your Google account.</span></li>
+      <li><span class="text">At the very top of the page, click the <strong>project dropdown</strong> (it might say "My First Project" or "Select a project").</span></li>
+      <li><span class="text">Click <strong>New Project</strong> in the top-right corner of the popup.</span></li>
+      <li><span class="text">In the <strong>Project name</strong> box, type: <code>Email Agent</code> — then click <strong>Create</strong>.</span></li>
+      <li><span class="text">Wait a few seconds, then click the project dropdown again and select <strong>Email Agent</strong> to make sure it's selected.</span></li>
+    </ol>
+    <div class="success"><strong>✓ You'll know you're done</strong> when you see "Email Agent" shown at the top of the page.</div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- SECTION 3 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-number">3</div>
+      <h2>Turn On Gmail and Calendar</h2>
+    </div>
+    <p style="margin-bottom:14px; color:#444;">You need to "enable" both services so your agent is allowed to use them.</p>
+    <ol class="steps">
+      <li><span class="text">In the left sidebar, click <strong>APIs &amp; Services</strong>, then click <strong>Library</strong>.</span></li>
+      <li><span class="text">In the search box, type <strong>Gmail API</strong>. Click on it in the results, then click the blue <strong>Enable</strong> button.</span></li>
+      <li><span class="text">Go back to the Library (click the back arrow or click Library in the sidebar again).</span></li>
+      <li><span class="text">Search for <strong>Google Calendar API</strong>. Click it, then click <strong>Enable</strong>.</span></li>
+    </ol>
+    <div class="success"><strong>✓ You'll know you're done</strong> when both APIs show a green "Disable" button (that means they're already on).</div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- SECTION 4 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-number">4</div>
+      <h2>Create Your Login Credentials</h2>
+    </div>
+    <p style="margin-bottom:14px; color:#444;">This is what lets your agent log into Google on your behalf.</p>
+    <ol class="steps">
+      <li><span class="text">In the left sidebar, click <strong>APIs &amp; Services → Credentials</strong>.</span></li>
+      <li><span class="text">Click <strong>+ Create Credentials</strong> at the top, then choose <strong>OAuth client ID</strong>.</span></li>
+      <li><span class="text">If a yellow banner says "Configure Consent Screen", click that button first:
+        <ul style="margin-top:8px; padding-left:20px; color:#555;">
+          <li>Choose <strong>External</strong> → click <strong>Create</strong></li>
+          <li>Fill in <strong>App name</strong>: <code>Email Agent</code></li>
+          <li>Fill in <strong>User support email</strong>: your Gmail address</li>
+          <li>Scroll to the bottom, fill in <strong>Developer contact email</strong>: your Gmail address</li>
+          <li>Click <strong>Save and Continue</strong> three times until you reach the Dashboard</li>
+          <li>On the Dashboard, click <strong>+ Add Users</strong> and add your Gmail address</li>
+        </ul>
+      </span></li>
+      <li><span class="text">Back on the Credentials page, click <strong>+ Create Credentials → OAuth client ID</strong> again.</span></li>
+      <li><span class="text">For <strong>Application type</strong>, choose <strong>Desktop app</strong>.</span></li>
+      <li><span class="text">For <strong>Name</strong>, type: <code>Email Agent</code> — then click <strong>Create</strong>.</span></li>
+    </ol>
+    <div class="success"><strong>✓ You'll know you're done</strong> when a popup appears showing "Your client ID" and "Your client secret".</div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- SECTION 5 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-number">5</div>
+      <h2>Download and Name the Credentials File</h2>
+    </div>
+    <ol class="steps">
+      <li><span class="text">In the popup that appeared, click <strong>Download JSON</strong>. A file will download to your computer.</span></li>
+      <li><span class="text">Find the downloaded file. It will have a long name like <code>client_secret_850853...json</code>.</span></li>
+      <li><span class="text"><strong>Rename it</strong> to exactly: <code>credentials.json</code> (all lowercase, no spaces).</span></li>
+      <li><span class="text">Move it into your <strong>Email-Agent</strong> project folder.</span></li>
+    </ol>
+    <div class="note"><strong>⚠️ Important:</strong> Never share this file or upload it to GitHub. It gives access to your Google account.</div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- SECTION 6 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-number">6</div>
+      <h2>Install Python on Your Computer</h2>
+    </div>
+    <p style="margin-bottom:14px; color:#444;">Python is the programming language the agent runs on. You only do this once.</p>
+
+    <div class="platform-split">
+      <div class="platform-box mac">
+        <h4>🍎 Mac</h4>
+        <ol class="steps" style="font-size:14px;">
+          <li><span class="text">Open <strong>Terminal</strong> (press Cmd+Space, type Terminal, hit Enter)</span></li>
+          <li><span class="text">Type this and press Enter:
+            <div class="codeblock">python3 --version</div>
+            If you see a version number, Python is already installed. Skip to Step 7.
+          </span></li>
+          <li><span class="text">If not installed, go to <strong>python.org/downloads</strong> and click the big yellow Download button. Open the installer and follow the steps.</span></li>
+        </ol>
+      </div>
+      <div class="platform-box win">
+        <h4>🪟 Windows</h4>
+        <ol class="steps" style="font-size:14px;">
+          <li><span class="text">Press <strong>Win+R</strong>, type <code>cmd</code>, press Enter</span></li>
+          <li><span class="text">Type this and press Enter:
+            <div class="codeblock">python --version</div>
+            If you see a version number, Python is already installed. Skip to Step 7.
+          </span></li>
+          <li><span class="text">If not installed, go to <strong>python.org/downloads</strong>, download the installer, run it, and <strong>check the box that says "Add Python to PATH"</strong> before clicking Install.</span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- SECTION 7 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-number">7</div>
+      <h2>Install the Agent Software</h2>
+    </div>
+    <p style="margin-bottom:14px; color:#444;">This downloads all the pieces the agent needs to run.</p>
+
+    <div class="platform-split">
+      <div class="platform-box mac">
+        <h4>🍎 Mac — in Terminal</h4>
+        <div class="codeblock">
+          <span class="comment"># Navigate to the project folder</span><br/>
+          cd ~/Email-Agent<br/><br/>
+          <span class="comment"># Create your .env file</span><br/>
+          echo "ANTHROPIC_API_KEY=your-key-here" &gt; .env<br/>
+          echo "TIMEZONE=America/New_York" &gt;&gt; .env<br/><br/>
+          <span class="comment"># Install everything</span><br/>
+          pip3 install -r requirements.txt
+        </div>
+      </div>
+      <div class="platform-box win">
+        <h4>🪟 Windows — in Command Prompt</h4>
+        <div class="codeblock">
+          <span class="comment">:: Navigate to the project folder</span><br/>
+          cd %USERPROFILE%\Email-Agent<br/><br/>
+          <span class="comment">:: Create your .env file</span><br/>
+          echo ANTHROPIC_API_KEY=your-key-here &gt; .env<br/>
+          echo TIMEZONE=America/New_York &gt;&gt; .env<br/><br/>
+          <span class="comment">:: Install everything</span><br/>
+          pip install -r requirements.txt
+        </div>
+      </div>
+    </div>
+    <div class="note"><strong>Replace</strong> <code>your-key-here</code> with your actual Anthropic API key from console.anthropic.com.</div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- SECTION 8 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-number">8</div>
+      <h2>Sign In to Google (One-Time Step)</h2>
+    </div>
+    <p style="margin-bottom:14px; color:#444;">The first time you run the agent, a browser window will open asking you to sign in. You only do this once.</p>
+    <ol class="steps">
+      <li><span class="text">In Terminal (Mac) or Command Prompt (Windows), run:
+        <div class="codeblock">python agent.py --dry-run</div>
+      </span></li>
+      <li><span class="text">A browser window will automatically open. Sign in with <strong>brandon.usgovtservices@gmail.com</strong>.</span></li>
+      <li><span class="text">Google will ask: <em>"Email Agent wants access to your Gmail and Calendar"</em> — click <strong>Allow</strong>.</span></li>
+      <li><span class="text">The browser will show a message saying authentication is complete. Go back to Terminal/Command Prompt.</span></li>
+      <li><span class="text">The agent will run a test scan of your inbox. You'll see output like:<br/>
+        <div class="codeblock">Email Agent ready [dry-run].<br/>Connected to Google services.<br/>Found X unread email(s).</div>
+      </span></li>
+    </ol>
+    <div class="success"><strong>✓ You'll know you're done</strong> when you see "Connected to Google services." — a file called <code>token.json</code> is now saved in your folder. You won't need to sign in again.</div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- SECTION 9 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-number">9</div>
+      <h2>Run the Agent</h2>
+    </div>
+    <p style="margin-bottom:14px; color:#444;">You're ready to go. Here's how to use it.</p>
+    <ol class="steps">
+      <li><span class="text"><strong>Process your inbox now</strong> — reads unread emails and creates Gmail drafts:
+        <div class="codeblock">python agent.py</div>
+      </span></li>
+      <li><span class="text"><strong>Check your Gmail Drafts folder</strong> — any emails that needed a reply will have a draft waiting for you to review and send.</span></li>
+      <li><span class="text"><strong>Check Google Calendar</strong> — any meeting requests will have been added automatically.</span></li>
+    </ol>
+    <div class="note"><strong>Remember:</strong> The agent never sends emails on its own. It only creates drafts. You are always in control of what gets sent.</div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- SECTION 10 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-number">10</div>
+      <h2>Quick Reference Commands</h2>
+    </div>
+    <p style="margin-bottom:14px; color:#444;">Open Terminal (Mac) or Command Prompt (Windows), navigate to your Email-Agent folder, then run any of these:</p>
+
+    <table style="width:100%; border-collapse:collapse; font-size:14px;">
+      <thead>
+        <tr style="background:#f0f6ff;">
+          <th style="text-align:left; padding:10px 14px; border-radius:6px 0 0 6px;">What you want to do</th>
+          <th style="text-align:left; padding:10px 14px; border-radius:0 6px 6px 0;">Command</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid #f0f0f0;">
+          <td style="padding:10px 14px;">Process your inbox right now</td>
+          <td style="padding:10px 14px;"><code>python agent.py</code></td>
+        </tr>
+        <tr style="border-bottom:1px solid #f0f0f0;">
+          <td style="padding:10px 14px;">Process only 5 emails at a time</td>
+          <td style="padding:10px 14px;"><code>python agent.py --limit 5</code></td>
+        </tr>
+        <tr style="border-bottom:1px solid #f0f0f0;">
+          <td style="padding:10px 14px;">Test run — no drafts created</td>
+          <td style="padding:10px 14px;"><code>python agent.py --dry-run</code></td>
+        </tr>
+        <tr style="border-bottom:1px solid #f0f0f0;">
+          <td style="padding:10px 14px;">Run automatically every 15 minutes</td>
+          <td style="padding:10px 14px;"><code>python agent.py --watch</code></td>
+        </tr>
+        <tr>
+          <td style="padding:10px 14px;">Run automatically every 5 minutes</td>
+          <td style="padding:10px 14px;"><code>python agent.py --watch --interval 5</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr class="divider"/>
+
+  <div class="success" style="font-size:15px;">
+    <strong>✓ All done!</strong> Your AI email agent is connected to Gmail and Google Calendar.
+    New emails will be processed automatically, drafts will appear in your Gmail Drafts folder,
+    and meeting requests will be added to your calendar.
+  </div>
+
+  <div class="footer">
+    Prepared for Brandon Michael &nbsp;·&nbsp; US Government Services &nbsp;·&nbsp; brandon@usgovtservices.com &nbsp;·&nbsp; 571-528-8760
+  </div>
+
+</div>
+</body>
+</html>
