@@ -1,5 +1,6 @@
 import os
 import json
+import webbrowser
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request, AuthorizedSession
 
@@ -11,21 +12,15 @@ SCOPES = [
 TOKEN_FILE = "token.json"
 CREDENTIALS_FILE = "credentials.json"
 
-GMAIL_BASE = "https://gmail.googleapis.com/gmail/v1/users/me"
-CALENDAR_BASE = "https://www.googleapis.com/calendar/v3"
-
 
 def get_google_services():
     """Return (gmail_session, calendar_session) as AuthorizedSession objects.
 
     Uses requests transport to avoid httplib2 SSL issues in proxy environments.
-    On first run, triggers browser OAuth flow or manual code exchange.
+    On first run, triggers browser OAuth flow and writes token.json.
     """
     creds = _load_or_refresh_credentials()
-
-    gmail_session = AuthorizedSession(creds)
-    calendar_session = AuthorizedSession(creds)
-    return gmail_session, calendar_session
+    return AuthorizedSession(creds), AuthorizedSession(creds)
 
 
 def _load_or_refresh_credentials() -> Credentials:
@@ -48,11 +43,48 @@ def _load_or_refresh_credentials() -> Credentials:
             creds.refresh(Request())
             _save_credentials(creds)
         else:
-            raise RuntimeError(
-                "token.json is missing or invalid. "
-                "Run the OAuth flow to generate it."
-            )
+            creds = _run_oauth_flow()
 
+    return creds
+
+
+def _run_oauth_flow() -> Credentials:
+    """Run browser-based OAuth on local machines, or print a manual URL as fallback."""
+    if not os.path.exists(CREDENTIALS_FILE):
+        raise FileNotFoundError(
+            "credentials.json not found. Download OAuth 2.0 credentials from "
+            "Google Cloud Console (APIs & Services → Credentials) and place the "
+            "file in this folder renamed to credentials.json."
+        )
+
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+
+    try:
+        # Works on local Mac/Windows — opens a browser tab automatically
+        creds = flow.run_local_server(port=0)
+    except webbrowser.Error:
+        # Headless / server environment — print URL for manual completion
+        flow.redirect_uri = "http://localhost"
+        auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
+        print("\n" + "=" * 60)
+        print("MANUAL SIGN-IN REQUIRED")
+        print("=" * 60)
+        print("\nOpen this URL in your browser:\n")
+        print(auth_url)
+        print("\nAfter signing in, copy the full redirect URL from your")
+        print("browser's address bar (starts with http://localhost?code=...)")
+        print("and paste it below.\n")
+        redirect_url = input("Paste redirect URL: ").strip()
+        from urllib.parse import urlparse, parse_qs
+        code = parse_qs(urlparse(redirect_url).query).get("code", [None])[0]
+        if not code:
+            raise ValueError("Could not find authorization code in the URL you pasted.")
+        flow.fetch_token(code=code)
+        creds = flow.credentials
+
+    _save_credentials(creds)
     return creds
 
 
