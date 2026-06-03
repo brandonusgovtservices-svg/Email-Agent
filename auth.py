@@ -1,8 +1,7 @@
 import os
-from google.auth.transport.requests import Request
+import json
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
+from google.auth.transport.requests import Request, AuthorizedSession
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
@@ -12,33 +11,51 @@ SCOPES = [
 TOKEN_FILE = "token.json"
 CREDENTIALS_FILE = "credentials.json"
 
+GMAIL_BASE = "https://gmail.googleapis.com/gmail/v1/users/me"
+CALENDAR_BASE = "https://www.googleapis.com/calendar/v3"
+
 
 def get_google_services():
-    """Authenticate with Google and return (gmail_service, calendar_service).
+    """Return (gmail_session, calendar_session) as AuthorizedSession objects.
 
-    On first run, opens a browser OAuth consent flow and writes token.json.
-    Subsequent runs refresh silently from token.json.
+    Uses requests transport to avoid httplib2 SSL issues in proxy environments.
+    On first run, triggers browser OAuth flow or manual code exchange.
     """
+    creds = _load_or_refresh_credentials()
+
+    gmail_session = AuthorizedSession(creds)
+    calendar_session = AuthorizedSession(creds)
+    return gmail_session, calendar_session
+
+
+def _load_or_refresh_credentials() -> Credentials:
     creds = None
 
     if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+        with open(TOKEN_FILE) as f:
+            t = json.load(f)
+        creds = Credentials(
+            token=t.get("token"),
+            refresh_token=t.get("refresh_token"),
+            token_uri=t.get("token_uri", "https://oauth2.googleapis.com/token"),
+            client_id=t.get("client_id"),
+            client_secret=t.get("client_secret"),
+            scopes=t.get("scopes"),
+        )
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
+            _save_credentials(creds)
         else:
-            if not os.path.exists(CREDENTIALS_FILE):
-                raise FileNotFoundError(
-                    "credentials.json not found. Download OAuth 2.0 credentials "
-                    "from Google Cloud Console and place them in the project root."
-                )
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-            creds = flow.run_local_server(port=0)
+            raise RuntimeError(
+                "token.json is missing or invalid. "
+                "Run the OAuth flow to generate it."
+            )
 
-        with open(TOKEN_FILE, "w") as f:
-            f.write(creds.to_json())
+    return creds
 
-    gmail = build("gmail", "v1", credentials=creds)
-    calendar = build("calendar", "v3", credentials=creds)
-    return gmail, calendar
+
+def _save_credentials(creds: Credentials) -> None:
+    with open(TOKEN_FILE, "w") as f:
+        f.write(creds.to_json())

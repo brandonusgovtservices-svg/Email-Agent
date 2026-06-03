@@ -1,22 +1,23 @@
 from datetime import datetime, timedelta, timezone
 
+BASE = "https://www.googleapis.com/calendar/v3"
 
-def get_upcoming_events(calendar_service, days: int = 7) -> list[dict]:
-    """Return simplified upcoming events for the next `days` days."""
+
+def get_upcoming_events(session, days: int = 7) -> list[dict]:
     now = datetime.now(timezone.utc)
     end = now + timedelta(days=days)
 
-    result = calendar_service.events().list(
-        calendarId="primary",
-        timeMin=now.isoformat(),
-        timeMax=end.isoformat(),
-        singleEvents=True,
-        orderBy="startTime",
-        maxResults=25,
-    ).execute()
+    r = session.get(f"{BASE}/calendars/primary/events", params={
+        "timeMin": now.isoformat(),
+        "timeMax": end.isoformat(),
+        "singleEvents": "true",
+        "orderBy": "startTime",
+        "maxResults": 25,
+    })
+    r.raise_for_status()
 
     events = []
-    for item in result.get("items", []):
+    for item in r.json().get("items", []):
         start = item["start"].get("dateTime", item["start"].get("date"))
         end_time = item["end"].get("dateTime", item["end"].get("date"))
         events.append({
@@ -30,7 +31,7 @@ def get_upcoming_events(calendar_service, days: int = 7) -> list[dict]:
 
 
 def create_calendar_event(
-    calendar_service,
+    session,
     title: str,
     start_datetime: str,
     end_datetime: str,
@@ -38,7 +39,6 @@ def create_calendar_event(
     attendees: list[str] | None = None,
     tz: str = "America/New_York",
 ) -> dict:
-    """Create a Google Calendar event. Returns event ID and link."""
     event: dict = {
         "summary": title,
         "start": {"dateTime": start_datetime, "timeZone": tz},
@@ -49,12 +49,13 @@ def create_calendar_event(
     if attendees:
         event["attendees"] = [{"email": a} for a in attendees]
 
-    created = calendar_service.events().insert(
-        calendarId="primary",
-        body=event,
-        sendUpdates="none",
-    ).execute()
-
+    r = session.post(
+        f"{BASE}/calendars/primary/events",
+        json=event,
+        params={"sendUpdates": "none"},
+    )
+    r.raise_for_status()
+    created = r.json()
     return {
         "event_id": created["id"],
         "link": created.get("htmlLink", ""),

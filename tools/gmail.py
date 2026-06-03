@@ -1,22 +1,22 @@
 import base64
 from email.mime.text import MIMEText
 
-
-def list_unread_emails(gmail_service, max_results: int = 20) -> list[str]:
-    """Return message IDs for unread non-promotional emails."""
-    result = gmail_service.users().messages().list(
-        userId="me",
-        q="is:unread -category:promotions -category:social",
-        maxResults=max_results,
-    ).execute()
-    return [m["id"] for m in result.get("messages", [])]
+BASE = "https://gmail.googleapis.com/gmail/v1/users/me"
 
 
-def get_email_details(gmail_service, msg_id: str) -> dict:
-    """Return a structured summary of an email."""
-    message = gmail_service.users().messages().get(
-        userId="me", id=msg_id, format="full"
-    ).execute()
+def list_unread_emails(session, max_results: int = 20) -> list[str]:
+    r = session.get(f"{BASE}/messages", params={
+        "q": "is:unread -category:promotions -category:social",
+        "maxResults": max_results,
+    })
+    r.raise_for_status()
+    return [m["id"] for m in r.json().get("messages", [])]
+
+
+def get_email_details(session, msg_id: str) -> dict:
+    r = session.get(f"{BASE}/messages/{msg_id}", params={"format": "full"})
+    r.raise_for_status()
+    message = r.json()
 
     headers = {h["name"]: h["value"] for h in message["payload"]["headers"]}
     body = _extract_body(message["payload"])
@@ -34,65 +34,62 @@ def get_email_details(gmail_service, msg_id: str) -> dict:
 
 
 def create_draft_reply(
-    gmail_service,
+    session,
     to: str,
     subject: str,
     body: str,
     thread_id: str | None = None,
 ) -> dict:
-    """Create a Gmail draft. Returns the new draft ID."""
     subject_line = subject if subject.startswith("Re:") else f"Re: {subject}"
-
     mime_msg = MIMEText(body, "plain")
     mime_msg["to"] = to
     mime_msg["subject"] = subject_line
 
     raw = base64.urlsafe_b64encode(mime_msg.as_bytes()).decode()
-    draft_body: dict = {"message": {"raw": raw}}
+    payload: dict = {"message": {"raw": raw}}
     if thread_id:
-        draft_body["message"]["threadId"] = thread_id
+        payload["message"]["threadId"] = thread_id
 
-    draft = gmail_service.users().drafts().create(userId="me", body=draft_body).execute()
+    r = session.post(f"{BASE}/drafts", json=payload)
+    r.raise_for_status()
+    draft = r.json()
     return {"draft_id": draft["id"], "status": "Draft created — not sent"}
 
 
-def label_email(gmail_service, msg_id: str, label_name: str) -> dict:
-    """Add a named label to an email, creating the label in Gmail if needed."""
-    label_id = _get_or_create_label(gmail_service, label_name)
-    gmail_service.users().messages().modify(
-        userId="me",
-        id=msg_id,
-        body={"addLabelIds": [label_id]},
-    ).execute()
+def label_email(session, msg_id: str, label_name: str) -> dict:
+    label_id = _get_or_create_label(session, label_name)
+    r = session.post(
+        f"{BASE}/messages/{msg_id}/modify",
+        json={"addLabelIds": [label_id]},
+    )
+    r.raise_for_status()
     return {"status": f"Labeled '{label_name}'"}
 
 
-def mark_as_read(gmail_service, msg_id: str) -> None:
-    gmail_service.users().messages().modify(
-        userId="me", id=msg_id, body={"removeLabelIds": ["UNREAD"]}
-    ).execute()
+def mark_as_read(session, msg_id: str) -> None:
+    session.post(
+        f"{BASE}/messages/{msg_id}/modify",
+        json={"removeLabelIds": ["UNREAD"]},
+    ).raise_for_status()
 
 
-def _get_or_create_label(gmail_service, name: str) -> str:
-    """Return the Gmail label ID for `name`, creating it if it doesn't exist."""
-    labels = gmail_service.users().labels().list(userId="me").execute()
-    for label in labels.get("labels", []):
+def _get_or_create_label(session, name: str) -> str:
+    r = session.get(f"{BASE}/labels")
+    r.raise_for_status()
+    for label in r.json().get("labels", []):
         if label["name"].lower() == name.lower():
             return label["id"]
 
-    created = gmail_service.users().labels().create(
-        userId="me",
-        body={
-            "name": name,
-            "labelListVisibility": "labelShow",
-            "messageListVisibility": "show",
-        },
-    ).execute()
-    return created["id"]
+    r = session.post(f"{BASE}/labels", json={
+        "name": name,
+        "labelListVisibility": "labelShow",
+        "messageListVisibility": "show",
+    })
+    r.raise_for_status()
+    return r.json()["id"]
 
 
 def _extract_body(payload: dict) -> str:
-    """Walk the MIME tree and return the first plain-text body."""
     if "parts" in payload:
         for part in payload["parts"]:
             text = _extract_body(part)
