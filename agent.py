@@ -1,163 +1,161 @@
-"""Email agent — reads Gmail, drafts replies, creates calendar events."""
-
-import argparse
+import asyncio
 import json
 import os
-import time
-import anthropic
-from dotenv import load_dotenv
 
-from auth import get_google_services
-from tools.gmail import list_unread_emails, get_email_details, create_draft_reply, mark_as_read, label_email
-from tools.calendar import get_upcoming_events, create_calendar_event
-from tools.definitions import TOOLS
+from anthropic import AsyncAnthropic
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
 
-load_dotenv()
+from config import (
+    CLAUDE_MODEL,
+    MAX_AGENT_TURNS,
+    POLL_INTERVAL_SECONDS,
+    ROBINHOOD_MCP_URL,
+    TRADING_EMAIL_QUERY,
+)
+from gmail_client import GmailClient
 
-MODEL = "claude-opus-4-8"
+SYSTEM_PROMPT = """You are an AI trading agent that processes email trading instructions and executes trades on Robinhood.
 
-SIGNATURE = """
-Brandon Michael
-US Government Services
-571-528-8760
-brandon@usgovtservices.com"""
+When given an email containing trading instructions, you should:
+1. Parse the instruction carefully: stock symbol, action (BUY/SELL), and quantity or dollar amount.
+2. Check the current portfolio state and available buying power using the Robinhood tools.
+3. Validate the trade is feasible given account limits and available funds.
+4. Execute the trade if it is unambiguous and within safe limits.
+5. Summarize what was done — or clearly explain why the trade was not executed.
 
-SYSTEM_PROMPT = f"""You are Brandon Michael's personal email assistant at US Government Services. Your job is to process unread emails and take the right action for each one.
+Rules:
+- If the instruction is ambiguous, do NOT execute any trade.
+- Never exceed available buying power.
+- Only trade equities (stocks) during beta — no options, crypto, futures, or event contracts.
+- Always confirm order details before placing (preview first if the tool supports it).
 
-Brandon's signature (use at the end of every draft reply):
-{SIGNATURE}
-
-For each email:
-1. Call get_email_details to read the full message.
-2. Decide: is it a scheduling/meeting request, a question/action item, or something that needs no reply (newsletters, receipts, notifications)?
-3. Label the email when relevant:
-   - Call label_email with label "Scheduling" for any meeting, appointment, or calendar request
-   - Call label_email with label "Urgent" for time-sensitive emails — think: ASAP language, hard deadlines, angry or escalating clients, government compliance notices
-4. For scheduling emails:
-   a. Call get_upcoming_events to check what's already on the calendar.
-   b. Call create_calendar_event to block the time.
-   c. Call create_draft_reply to confirm — keep it short and casual.
-5. For other emails that need a response, call create_draft_reply with a casual, friendly reply. No corporate stiffness — use contractions, be direct, sound like a real person.
-6. For no-reply emails, briefly say why you're skipping a draft.
-
-Tone rules: casual and warm, not formal. Short sentences. Don't start with "I hope this email finds you well." Sign off every draft with Brandon's signature above.
-Always use create_draft_reply — never send emails directly."""
+End your response with a concise plain-text summary suitable for an email reply."""
 
 
-def _dispatch(tool_name: str, tool_input: dict, gmail, calendar, dry_run: bool) -> str:
-    if dry_run and tool_name in ("create_draft_reply", "create_calendar_event", "label_email"):
-        return json.dumps({"status": f"[dry-run] Would call {tool_name}", "input": tool_input})
+class EmailTradingAgent:
+    def __init__(self):
+        self.claude = AsyncAnthropic()
+        self.gmail = GmailClient()
+        self.robinhood_token = os.environ["ROBINHOOD_MCP_TOKEN"]
 
-    if tool_name == "get_email_details":
-        return json.dumps(get_email_details(gmail, tool_input["email_id"]))
-    elif tool_name == "get_upcoming_events":
-        return json.dumps(get_upcoming_events(calendar, tool_input.get("days", 7)))
-    elif tool_name == "create_calendar_event":
-        tz = tool_input.get("timezone") or os.getenv("TIMEZONE", "America/New_York")
-        return json.dumps(create_calendar_event(
-            calendar,
-            tool_input["title"],
-            tool_input["start_datetime"],
-            tool_input["end_datetime"],
-            tool_input.get("description"),
-            tool_input.get("attendees"),
-            tz,
-        ))
-    elif tool_name == "create_draft_reply":
-        return json.dumps(create_draft_reply(
-            gmail,
-            tool_input["to"],
-            tool_input["subject"],
-            tool_input["body"],
-            tool_input.get("thread_id"),
-        ))
-    elif tool_name == "label_email":
-        return json.dumps(label_email(gmail, tool_input["email_id"], tool_input["label"]))
-    else:
-        return json.dumps({"error": f"Unknown tool: {tool_name}"})
+    async def run(self):
+        while True:
+            try:
+                await self.process_pending_emails()
+            except Exception as exc:
+                print(f"[error] {exc}")
+            await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
+    async def process_pending_emails(self):
+        threads = self.gmail.search_threads(TRADING_EMAIL_QUERY)
+        if not threads:
+            return
+        print(f"[info] {len(threads)} pending trading instruction(s)")
+        for thread in threads:
+            await self._handle_thread(thread)
 
-def process_email(email_id: str, client: anthropic.Anthropic, gmail, calendar, dry_run: bool) -> None:
-    print(f"\n  Email {email_id}")
+    async def _handle_thread(self, thread: dict):
+        thread_id = thread["id"]
+        email = self.gmail.get_thread_content(thread_id)
+        if not email:
+            return
+        print(f"[info] processing thread {thread_id}: {email['subject']}")
+        try:
+            result = await self._run_trading_agent(email)
+            self.gmail.send_reply(email, result)
+        except Exception as exc:
+            print(f"[error] thread {thread_id}: {exc}")
+            self.gmail.send_reply(
+                email,
+                f"Your trading instruction could not be processed.\n\nError: {exc}",
+            )
+        finally:
+            self.gmail.mark_processed(thread_id)
 
-    messages = [{"role": "user", "content": f"Process email ID: {email_id}"}]
+    async def _run_trading_agent(self, email: dict) -> str:
+        async with streamablehttp_client(
+            ROBINHOOD_MCP_URL,
+            headers={"Authorization": f"Bearer {self.robinhood_token}"},
+        ) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                tools_response = await session.list_tools()
+                tools = [
+                    {
+                        "name": t.name,
+                        "description": t.description or "",
+                        "input_schema": t.inputSchema,
+                    }
+                    for t in tools_response.tools
+                ]
+                return await self._agent_loop(email, session, tools)
 
-    cached_system = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
+    async def _agent_loop(
+        self, email: dict, session: ClientSession, tools: list
+    ) -> str:
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"Process this trading instruction email:\n\n"
+                    f"From: {email['from']}\n"
+                    f"Subject: {email['subject']}\n\n"
+                    f"{email['body']}"
+                ),
+            }
+        ]
 
-    while True:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=4096,
-            system=cached_system,
-            tools=TOOLS,
-            messages=messages,
-        )
+        for _ in range(MAX_AGENT_TURNS):
+            response = await self.claude.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=4096,
+                system=SYSTEM_PROMPT,
+                tools=tools,
+                messages=messages,
+            )
 
-        if response.stop_reason == "end_turn":
-            for block in response.content:
-                if hasattr(block, "text") and block.text:
-                    print(f"  → {block.text}")
-            break
-
-        if response.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": response.content})
+
+            if response.stop_reason == "end_turn":
+                return _extract_text(response.content)
+
+            if response.stop_reason != "tool_use":
+                break
 
             tool_results = []
             for block in response.content:
-                if block.type == "tool_use":
-                    preview = {k: v for k, v in block.input.items() if k not in ("body",)}
-                    print(f"  [tool] {block.name}({preview})")
-                    result = _dispatch(block.name, block.input, gmail, calendar, dry_run)
-                    tool_results.append({
+                if block.type != "tool_use":
+                    continue
+                call_result = await session.call_tool(block.name, block.input)
+                tool_results.append(
+                    {
                         "type": "tool_result",
                         "tool_use_id": block.id,
-                        "content": result,
-                    })
-
+                        "content": _serialize_mcp_content(call_result.content),
+                        "is_error": call_result.isError,
+                    }
+                )
             messages.append({"role": "user", "content": tool_results})
+
+        return _extract_text(messages[-1].get("content", []))
+
+
+def _extract_text(content) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(b.text for b in content if hasattr(b, "text"))
+    return str(content)
+
+
+def _serialize_mcp_content(content) -> str:
+    if not content:
+        return ""
+    parts = []
+    for item in content:
+        if hasattr(item, "text"):
+            parts.append(item.text)
         else:
-            break
-
-    if not dry_run:
-        mark_as_read(gmail, email_id)
-
-
-def run(limit: int, dry_run: bool, client: anthropic.Anthropic, gmail, calendar) -> None:
-    email_ids = list_unread_emails(gmail, max_results=limit)
-
-    if not email_ids:
-        print("  No unread emails.")
-        return
-
-    print(f"  Found {len(email_ids)} unread email(s).")
-
-    for email_id in email_ids:
-        try:
-            process_email(email_id, client, gmail, calendar, dry_run)
-        except Exception as exc:
-            print(f"  [error] {email_id}: {exc}")
-
-    print(f"\n  Done. Processed {len(email_ids)} email(s).")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Brandon's AI email agent")
-    parser.add_argument("--limit", type=int, default=20, help="Max emails per run (default 20)")
-    parser.add_argument("--dry-run", action="store_true", help="Analyse emails without writing drafts or events")
-    parser.add_argument("--watch", action="store_true", help="Run continuously on a schedule")
-    parser.add_argument("--interval", type=int, default=15, help="Minutes between checks in watch mode (default 15)")
-    args = parser.parse_args()
-
-    client = anthropic.Anthropic()
-    gmail, calendar = get_google_services()
-    print("Email Agent ready" + (" [dry-run]" if args.dry_run else "") + ".")
-
-    if args.watch:
-        print(f"Watch mode — checking every {args.interval} minutes. Ctrl+C to stop.\n")
-        while True:
-            print(f"[{time.strftime('%H:%M:%S')}] Checking emails...")
-            run(args.limit, args.dry_run, client, gmail, calendar)
-            print(f"Sleeping {args.interval}m...")
-            time.sleep(args.interval * 60)
-    else:
-        run(args.limit, args.dry_run, client, gmail, calendar)
+            parts.append(str(item))
+    return "\n".join(parts)
