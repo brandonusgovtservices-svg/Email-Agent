@@ -4,3 +4,5 @@ google-auth-oauthlib>=1.2.0
 google-auth-httplib2>=0.2.0
 google-api-python-client>=2.120.0
 python-dotenv>=1.0.0
+browser-use>=0.13.0
+playwright>=1.55.0
