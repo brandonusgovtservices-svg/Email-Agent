@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from auth import get_google_services
 from tools.gmail import list_unread_emails, get_email_details, create_draft_reply, mark_as_read, label_email
 from tools.calendar import get_upcoming_events, create_calendar_event
+from tools.browser import browse_web
 from tools.definitions import TOOLS
 
 load_dotenv()
@@ -39,6 +40,7 @@ For each email:
    c. Call create_draft_reply to confirm — keep it short and casual.
 5. For other emails that need a response, call create_draft_reply with a casual, friendly reply. No corporate stiffness — use contractions, be direct, sound like a real person.
 6. For no-reply emails, briefly say why you're skipping a draft.
+7. If you need to look something up on the web to draft an accurate reply (e.g. a sender's company, a link mentioned in the email), call browse_web. It's read-only — never use it to log in, submit forms, or make purchases.
 
 Tone rules: casual and warm, not formal. Short sentences. Don't start with "I hope this email finds you well." Sign off every draft with Brandon's signature above.
 Always use create_draft_reply — never send emails directly."""
@@ -73,6 +75,8 @@ def _dispatch(tool_name: str, tool_input: dict, gmail, calendar, dry_run: bool) 
         ))
     elif tool_name == "label_email":
         return json.dumps(label_email(gmail, tool_input["email_id"], tool_input["label"]))
+    elif tool_name == "browse_web":
+        return json.dumps(browse_web(tool_input["task"]))
     else:
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
 

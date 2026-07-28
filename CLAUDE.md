@@ -12,6 +12,9 @@ Python email agent that uses Claude Opus (Anthropic SDK) as an agentic reasoning
 # Install dependencies
 pip install -r requirements.txt
 
+# One-time: download the Chromium build browser-use/Playwright drives
+playwright install chromium
+
 # First run — triggers Google OAuth browser flow, writes token.json
 python agent.py
 
@@ -55,9 +58,10 @@ Handles Google OAuth2 for both Gmail and Calendar APIs using a single `get_googl
 |------|---------|
 | `tools/gmail.py` | `list_unread_emails`, `get_email_details`, `create_draft_reply`, `label_email`, `mark_as_read` |
 | `tools/calendar.py` | `get_upcoming_events`, `create_calendar_event` |
+| `tools/browser.py` | `browse_web` — runs a [browser-use](https://github.com/browser-use/browser-use) sub-agent (headless Chromium via Playwright) to research something on the open web |
 | `tools/definitions.py` | Tool JSON schemas passed to Claude's `tools` parameter |
 
-The `_dispatch()` function in `agent.py` maps tool names from Claude's response to the Python functions above. `--dry-run` short-circuits `create_draft_reply`, `create_calendar_event`, and `label_email` in `_dispatch` without touching the LLM loop.
+The `_dispatch()` function in `agent.py` maps tool names from Claude's response to the Python functions above. `--dry-run` short-circuits `create_draft_reply`, `create_calendar_event`, and `label_email` in `_dispatch` without touching the LLM loop. `browse_web` is read-only, so it still runs in `--dry-run`.
 
 ### Agent behaviour
 
@@ -67,6 +71,7 @@ Claude is instructed to:
 - **Scheduling flow**: check calendar → create event → draft confirmation reply
 - **Other emails**: draft a casual, direct reply signed with Brandon's full signature
 - **No-reply emails** (receipts, newsletters): skip drafting, briefly explain why
+- **Research** — when drafting needs outside information (a sender's company, a link in the email), call `browse_web`; it drives a real headless browser but is instructed to stay read-only (no logins, forms, or purchases). Sub-agent model is `claude-sonnet-4-5` by default, overridable via the `BROWSE_MODEL` env var.
 
 ### Scheduling behaviour
 

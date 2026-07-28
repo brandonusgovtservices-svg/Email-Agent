@@ -101,4 +101,26 @@ TOOLS = [
             "required": ["to", "subject", "body"],
         },
     },
+    {
+        "name": "browse_web",
+        "description": (
+            "Browse the open web to research something relevant to an email — e.g. look up "
+            "a sender's company, check a link mentioned in a message, or find publicly "
+            "available information needed to draft an accurate reply. Read-only: never use "
+            "this to log in, submit forms, or complete purchases."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": (
+                        "Plain-language description of what to find, including a URL if known "
+                        "(e.g. 'Go to acmecorp.com and summarize what the company does')."
+                    ),
+                },
+            },
+            "required": ["task"],
+        },
+    },
 ]
